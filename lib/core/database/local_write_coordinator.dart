@@ -1,4 +1,4 @@
-﻿/// Serializes writes from both features, including their preflight reads.
+/// Serializes writes from both features, including their preflight reads.
 class LocalWriteCoordinator {
   Future<void> _pending = Future<void>.value();
 

@@ -1,4 +1,4 @@
-﻿import 'package:sqflite/sqflite.dart';
+import 'package:sqflite/sqflite.dart';
 
 import 'package:niksam/core/database/local_write_coordinator.dart';
 
@@ -46,7 +46,10 @@ class SqfliteTaskFormLocalDataSource implements TaskFormLocalDataSource {
     required Map<String, Object?> values,
   }) => _writes.run(() async {
     final rows = await _database.query(
-      'tasks', where: 'id = ?', whereArgs: [taskId], limit: 1,
+      'tasks',
+      where: 'id = ?',
+      whereArgs: [taskId],
+      limit: 1,
     );
     if (rows.isEmpty) throw StateError('Task no longer exists.');
     final existing = rows.single;
@@ -56,8 +59,12 @@ class SqfliteTaskFormLocalDataSource implements TaskFormLocalDataSource {
     }
     final oldPriority = existing['priority'];
     await _database.transaction((transaction) async {
-      await transaction.update('tasks', values,
-          where: 'id = ?', whereArgs: [taskId]);
+      await transaction.update(
+        'tasks',
+        values,
+        where: 'id = ?',
+        whereArgs: [taskId],
+      );
       _maybeFail();
       if (oldPriority != values['priority']) {
         await transaction.insert('activity_events', {
@@ -73,6 +80,8 @@ class SqfliteTaskFormLocalDataSource implements TaskFormLocalDataSource {
 
   void _maybeFail() {
     // Fail between the task and history writes to exercise rollback.
-    if (failWrites) throw StateError('Write failure injected with FAIL_WRITES=true.');
+    if (failWrites) {
+      throw StateError('Write failure injected with FAIL_WRITES=true.');
+    }
   }
 }

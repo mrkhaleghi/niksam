@@ -41,16 +41,18 @@ class TaskFormCubit extends Cubit<TaskFormState> {
     );
     if (next.title == previous.title &&
         next.description == previous.description &&
-        next.priority == previous.priority)
+        next.priority == previous.priority) {
       return;
+    }
     emit(TaskFormState(data: next));
   }
 
   Future<bool> save() async {
     if (isClosed ||
         state.status == TaskFormStatus.saving ||
-        state.status == TaskFormStatus.success)
+        state.status == TaskFormStatus.success) {
       return false;
+    }
     final data = state.data;
     if (data.title.trim().isEmpty) {
       emit(TaskFormState(data: data, status: TaskFormStatus.failure));
@@ -63,13 +65,15 @@ class TaskFormCubit extends Cubit<TaskFormState> {
       } else {
         await _repository.updateTask(data);
       }
-      if (!isClosed)
+      if (!isClosed) {
         emit(TaskFormState(data: data, status: TaskFormStatus.success));
+      }
       return true;
     } catch (_) {
       // Keep the draft for retry. The list continues to show committed data.
-      if (!isClosed)
+      if (!isClosed) {
         emit(TaskFormState(data: data, status: TaskFormStatus.failure));
+      }
       return false;
     }
   }

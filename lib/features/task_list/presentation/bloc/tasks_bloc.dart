@@ -28,19 +28,24 @@ class TasksBloc extends Bloc<TasksEvent, TasksState> {
     Emitter<TasksState> emit,
   ) async {
     final request = ++_activityRequest;
-    emit(state.copyWith(
-      activityTaskId: event.taskId,
-      activity: const [],
-      activityStatus: ActivityLoadStatus.loading,
-    ));
+    emit(
+      state.copyWith(
+        activityTaskId: event.taskId,
+        activity: const [],
+        activityStatus: ActivityLoadStatus.loading,
+      ),
+    );
     try {
       final activity = await _repository.getActivity(event.taskId);
       if (isClosed || emit.isDone || request != _activityRequest) return;
-      emit(state.copyWith(
-        activity: activity,
-        activityStatus: activity.isEmpty
-            ? ActivityLoadStatus.empty : ActivityLoadStatus.success,
-      ));
+      emit(
+        state.copyWith(
+          activity: activity,
+          activityStatus: activity.isEmpty
+              ? ActivityLoadStatus.empty
+              : ActivityLoadStatus.success,
+        ),
+      );
     } catch (_) {
       if (isClosed || emit.isDone || request != _activityRequest) return;
       emit(state.copyWith(activityStatus: ActivityLoadStatus.failure));
@@ -57,10 +62,12 @@ class TasksBloc extends Bloc<TasksEvent, TasksState> {
     Emitter<TasksState> emit,
   ) {
     if (event.priority == state.priorityFilter) return;
-    emit(state.copyWith(
-      priorityFilter: event.priority,
-      clearPriorityFilter: event.priority == null,
-    ));
+    emit(
+      state.copyWith(
+        priorityFilter: event.priority,
+        clearPriorityFilter: event.priority == null,
+      ),
+    );
   }
 
   void _onCompletionFilterChanged(
@@ -68,10 +75,12 @@ class TasksBloc extends Bloc<TasksEvent, TasksState> {
     Emitter<TasksState> emit,
   ) {
     if (event.completion == state.completionFilter) return;
-    emit(state.copyWith(
-      completionFilter: event.completion,
-      clearCompletionFilter: event.completion == null,
-    ));
+    emit(
+      state.copyWith(
+        completionFilter: event.completion,
+        clearCompletionFilter: event.completion == null,
+      ),
+    );
   }
 
   Future<void> _onLoadRequested(
@@ -93,31 +102,36 @@ class TasksBloc extends Bloc<TasksEvent, TasksState> {
     try {
       final tasks = await _repository.getTasks();
       if (request != _loadRequest || isClosed) return;
-      emit(state.copyWith(
-        tasks: tasks,
-        status: tasks.isEmpty ? TasksLoadStatus.empty : TasksLoadStatus.success,
-        clearFailure: _lastFailedMutation == null,
-      ));
+      emit(
+        state.copyWith(
+          tasks: tasks,
+          status: tasks.isEmpty
+              ? TasksLoadStatus.empty
+              : TasksLoadStatus.success,
+          failure: _lastFailedMutation == null ? null : TasksFailure.mutation,
+          clearFailure: _lastFailedMutation == null,
+        ),
+      );
     } catch (_) {
       if (request != _loadRequest || isClosed) return;
-      emit(state.copyWith(
-        status: TasksLoadStatus.failure,
-        failure: TasksFailure.load,
-      ));
+      emit(
+        state.copyWith(
+          status: TasksLoadStatus.failure,
+          failure: TasksFailure.load,
+        ),
+      );
     }
   }
 
   Future<void> _onToggleRequested(
     TasksToggleRequested event,
     Emitter<TasksState> emit,
-  ) =>
-      _serialize(() => _repository.toggleCompleted(event.taskId), emit);
+  ) => _serialize(() => _repository.toggleCompleted(event.taskId), emit);
 
   Future<void> _onDeleteRequested(
     TasksDeleteRequested event,
     Emitter<TasksState> emit,
-  ) =>
-      _serialize(() => _repository.deleteTask(event.taskId), emit);
+  ) => _serialize(() => _repository.deleteTask(event.taskId), emit);
 
   Future<void> _onRetryRequested(
     TasksRetryRequested event,
@@ -139,9 +153,9 @@ class TasksBloc extends Bloc<TasksEvent, TasksState> {
 
   Future<void> _serialize(
     Future<void> Function() operation,
-    Emitter<TasksState> emit,
-    {bool retry = false}
-  ) async {
+    Emitter<TasksState> emit, {
+    bool retry = false,
+  }) async {
     final next = _mutationQueue.then((_) async {
       if (isClosed || emit.isDone) return;
       // A newer successful action can supersede a queued retry.
@@ -160,19 +174,24 @@ class TasksBloc extends Bloc<TasksEvent, TasksState> {
         try {
           final storedTasks = await _repository.getTasks();
           if (recoveryRequest == _loadRequest && !isClosed && !emit.isDone) {
-            emit(state.copyWith(
-              tasks: storedTasks,
-              status: storedTasks.isEmpty
-                  ? TasksLoadStatus.empty : TasksLoadStatus.success,
-              failure: TasksFailure.mutation,
-            ));
+            emit(
+              state.copyWith(
+                tasks: storedTasks,
+                status: storedTasks.isEmpty
+                    ? TasksLoadStatus.empty
+                    : TasksLoadStatus.success,
+                failure: TasksFailure.mutation,
+              ),
+            );
           }
         } catch (_) {
           if (recoveryRequest == _loadRequest && !isClosed && !emit.isDone) {
-            emit(state.copyWith(
-              status: TasksLoadStatus.failure,
-              failure: TasksFailure.mutation,
-            ));
+            emit(
+              state.copyWith(
+                status: TasksLoadStatus.failure,
+                failure: TasksFailure.mutation,
+              ),
+            );
           }
         }
       }

@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:niksam/core/theme/app_colors.dart';
@@ -14,25 +14,16 @@ import 'package:niksam/features/task_list/presentation/widgets/task_count_badge.
 import 'package:niksam/features/task_list/presentation/widgets/task_filters.dart';
 import 'package:niksam/features/task_list/presentation/widgets/task_list_states.dart';
 
-class TasksPage extends StatelessWidget {
+class TasksPage extends StatefulWidget {
   const TasksPage({super.key, required this.openTaskForm});
 
   final Widget Function(Task? task) openTaskForm;
 
   @override
-  Widget build(BuildContext context) => _TasksView(openTaskForm: openTaskForm);
+  State<TasksPage> createState() => _TasksPageState();
 }
 
-class _TasksView extends StatefulWidget {
-  const _TasksView({required this.openTaskForm});
-
-  final Widget Function(Task? task) openTaskForm;
-
-  @override
-  State<_TasksView> createState() => _TasksViewState();
-}
-
-class _TasksViewState extends State<_TasksView> {
+class _TasksPageState extends State<TasksPage> {
   final _searchController = TextEditingController();
 
   @override

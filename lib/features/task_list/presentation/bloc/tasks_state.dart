@@ -35,18 +35,21 @@ class TasksState {
 
   List<Task> get visibleTasks {
     final normalizedQuery = query.trim().toLowerCase();
-    return tasks.where((task) {
-      final matchesQuery = normalizedQuery.isEmpty ||
-          task.title.toLowerCase().contains(normalizedQuery);
-      final matchesPriority = priorityFilter == null ||
-          task.priority == priorityFilter;
-      final matchesCompletion = switch (completionFilter) {
-        CompletionFilter.active => !task.isCompleted,
-        CompletionFilter.completed => task.isCompleted,
-        null => true,
-      };
-      return matchesQuery && matchesPriority && matchesCompletion;
-    }).toList(growable: false);
+    return tasks
+        .where((task) {
+          final matchesQuery =
+              normalizedQuery.isEmpty ||
+              task.title.toLowerCase().contains(normalizedQuery);
+          final matchesPriority =
+              priorityFilter == null || task.priority == priorityFilter;
+          final matchesCompletion = switch (completionFilter) {
+            CompletionFilter.active => !task.isCompleted,
+            CompletionFilter.completed => task.isCompleted,
+            null => true,
+          };
+          return matchesQuery && matchesPriority && matchesCompletion;
+        })
+        .toList(growable: false);
   }
 
   TasksState copyWith({
@@ -62,20 +65,19 @@ class TasksState {
     int? activityTaskId,
     List<TaskActivity>? activity,
     ActivityLoadStatus? activityStatus,
-  }) =>
-      TasksState(
-        tasks: tasks ?? this.tasks,
-        query: query ?? this.query,
-        priorityFilter: clearPriorityFilter
-            ? null
-            : priorityFilter ?? this.priorityFilter,
-        completionFilter: clearCompletionFilter
-            ? null
-            : completionFilter ?? this.completionFilter,
-        status: status ?? this.status,
-        failure: clearFailure ? null : failure ?? this.failure,
-        activityTaskId: activityTaskId ?? this.activityTaskId,
-        activity: activity ?? this.activity,
-        activityStatus: activityStatus ?? this.activityStatus,
-      );
+  }) => TasksState(
+    tasks: tasks ?? this.tasks,
+    query: query ?? this.query,
+    priorityFilter: clearPriorityFilter
+        ? null
+        : priorityFilter ?? this.priorityFilter,
+    completionFilter: clearCompletionFilter
+        ? null
+        : completionFilter ?? this.completionFilter,
+    status: status ?? this.status,
+    failure: clearFailure ? null : failure ?? this.failure,
+    activityTaskId: activityTaskId ?? this.activityTaskId,
+    activity: activity ?? this.activity,
+    activityStatus: activityStatus ?? this.activityStatus,
+  );
 }
