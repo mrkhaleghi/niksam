@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'package:niksam/core/di/injection.dart';
 import 'package:niksam/core/theme/app_colors.dart';
@@ -15,8 +16,9 @@ import 'package:niksam/features/task_list/presentation/bloc/tasks_bloc.dart';
 import 'package:niksam/features/task_list/presentation/bloc/tasks_event.dart';
 import 'package:niksam/features/task_list/presentation/pages/tasks_page.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('en');
   runApp(const TaskApp());
 }
 
