@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:niksam/features/task_list/domain/entities/task_list_query.dart';
 import 'package:niksam/features/task_list/domain/repositories/task_list_repository.dart';
 import 'package:niksam/features/task_list/presentation/bloc/tasks_event.dart';
 import 'package:niksam/features/task_list/presentation/bloc/tasks_state.dart';
@@ -52,35 +53,51 @@ class TasksBloc extends Bloc<TasksEvent, TasksState> {
     }
   }
 
-  void _onSearchChanged(TasksSearchChanged event, Emitter<TasksState> emit) {
+  Future<void> _onSearchChanged(
+    TasksSearchChanged event,
+    Emitter<TasksState> emit,
+  ) async {
     if (event.query == state.query) return;
-    emit(state.copyWith(query: event.query));
+    emit(
+      state.copyWith(
+        query: event.query,
+        tasks: const [],
+        status: TasksLoadStatus.loading,
+      ),
+    );
+    await _load(emit);
   }
 
-  void _onPriorityFilterChanged(
+  Future<void> _onPriorityFilterChanged(
     TasksPriorityFilterChanged event,
     Emitter<TasksState> emit,
-  ) {
+  ) async {
     if (event.priority == state.priorityFilter) return;
     emit(
       state.copyWith(
         priorityFilter: event.priority,
         clearPriorityFilter: event.priority == null,
+        tasks: const [],
+        status: TasksLoadStatus.loading,
       ),
     );
+    await _load(emit);
   }
 
-  void _onCompletionFilterChanged(
+  Future<void> _onCompletionFilterChanged(
     TasksCompletionFilterChanged event,
     Emitter<TasksState> emit,
-  ) {
+  ) async {
     if (event.completion == state.completionFilter) return;
     emit(
       state.copyWith(
         completionFilter: event.completion,
         clearCompletionFilter: event.completion == null,
+        tasks: const [],
+        status: TasksLoadStatus.loading,
       ),
     );
+    await _load(emit);
   }
 
   Future<void> _onLoadRequested(
@@ -97,15 +114,26 @@ class TasksBloc extends Bloc<TasksEvent, TasksState> {
   }
 
   Future<void> _load(Emitter<TasksState> emit) async {
+    if (isClosed || emit.isDone) return;
     final request = ++_loadRequest;
+    final query = TaskListQuery(
+      title: state.query,
+      priority: state.priorityFilter,
+      completed: switch (state.completionFilter) {
+        CompletionFilter.active => false,
+        CompletionFilter.completed => true,
+        null => null,
+      },
+    );
     emit(state.copyWith(status: TasksLoadStatus.loading));
     try {
-      final tasks = await _repository.getTasks();
-      if (request != _loadRequest || isClosed) return;
+      final result = await _repository.getTasks(query: query);
+      if (request != _loadRequest || isClosed || emit.isDone) return;
       emit(
         state.copyWith(
-          tasks: tasks,
-          status: tasks.isEmpty
+          tasks: result.tasks,
+          totalCount: result.totalCount,
+          status: result.tasks.isEmpty
               ? TasksLoadStatus.empty
               : TasksLoadStatus.success,
           failure: _lastFailedMutation == null ? null : TasksFailure.mutation,
@@ -113,11 +141,13 @@ class TasksBloc extends Bloc<TasksEvent, TasksState> {
         ),
       );
     } catch (_) {
-      if (request != _loadRequest || isClosed) return;
+      if (request != _loadRequest || isClosed || emit.isDone) return;
       emit(
         state.copyWith(
           status: TasksLoadStatus.failure,
-          failure: TasksFailure.load,
+          failure: _lastFailedMutation == null
+              ? TasksFailure.load
+              : TasksFailure.mutation,
         ),
       );
     }
@@ -170,30 +200,7 @@ class TasksBloc extends Bloc<TasksEvent, TasksState> {
         }
       } catch (_) {
         _lastFailedMutation = operation;
-        final recoveryRequest = ++_loadRequest;
-        try {
-          final storedTasks = await _repository.getTasks();
-          if (recoveryRequest == _loadRequest && !isClosed && !emit.isDone) {
-            emit(
-              state.copyWith(
-                tasks: storedTasks,
-                status: storedTasks.isEmpty
-                    ? TasksLoadStatus.empty
-                    : TasksLoadStatus.success,
-                failure: TasksFailure.mutation,
-              ),
-            );
-          }
-        } catch (_) {
-          if (recoveryRequest == _loadRequest && !isClosed && !emit.isDone) {
-            emit(
-              state.copyWith(
-                status: TasksLoadStatus.failure,
-                failure: TasksFailure.mutation,
-              ),
-            );
-          }
-        }
+        await _load(emit);
       }
     });
     _mutationQueue = next.catchError((Object _) {});

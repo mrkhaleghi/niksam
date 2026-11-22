@@ -1,6 +1,8 @@
 import 'package:niksam/features/task_list/data/services/local/task_list_local_data_source.dart';
 import 'package:niksam/features/task_list/domain/entities/task.dart';
 import 'package:niksam/features/task_list/domain/entities/task_activity.dart';
+import 'package:niksam/features/task_list/domain/entities/task_list_query.dart';
+import 'package:niksam/features/task_list/domain/entities/task_list_result.dart';
 import 'package:niksam/features/task_list/domain/repositories/task_list_repository.dart';
 
 class TaskListRepositoryImpl implements TaskListRepository {
@@ -9,8 +11,15 @@ class TaskListRepositoryImpl implements TaskListRepository {
   final TaskListLocalDataSource _localDataSource;
 
   @override
-  Future<List<Task>> getTasks() async =>
-      List.unmodifiable((await _localDataSource.getTasks()).map(_taskFromRow));
+  Future<TaskListResult> getTasks({
+    TaskListQuery query = const TaskListQuery(),
+  }) async {
+    final result = await _localDataSource.getTasks(query);
+    return TaskListResult(
+      tasks: result.tasks.map(_taskFromRow).toList(growable: false),
+      totalCount: result.totalCount,
+    );
+  }
 
   @override
   Future<List<TaskActivity>> getActivity(int taskId) async => List.unmodifiable(

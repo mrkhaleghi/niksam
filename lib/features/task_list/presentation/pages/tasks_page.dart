@@ -66,9 +66,9 @@ class _TasksPageState extends State<TasksPage> {
                   alignment: AlignmentDirectional.centerEnd,
                   child: BlocBuilder<TasksBloc, TasksState>(
                     buildWhen: (previous, current) =>
-                        previous.tasks.length != current.tasks.length,
+                        previous.totalCount != current.totalCount,
                     builder: (context, state) =>
-                        TaskCountBadge(count: state.tasks.length),
+                        TaskCountBadge(count: state.totalCount),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -97,6 +97,7 @@ class _TasksPageState extends State<TasksPage> {
                   previous.priorityFilter != current.priorityFilter ||
                   previous.completionFilter != current.completionFilter ||
                   previous.status != current.status ||
+                  previous.totalCount != current.totalCount ||
                   previous.failure != current.failure,
               builder: (context, state) {
                 if ((state.status == TasksLoadStatus.initial ||
@@ -113,10 +114,10 @@ class _TasksPageState extends State<TasksPage> {
                     ),
                   );
                 }
-                final tasks = state.visibleTasks;
+                final tasks = state.tasks;
                 if (tasks.isEmpty) {
                   final emptyState = TaskEmptyState(
-                    hasTasks: state.tasks.isNotEmpty,
+                    hasTasks: state.totalCount > 0,
                     hasQuery:
                         state.query.trim().isNotEmpty ||
                         state.priorityFilter != null ||

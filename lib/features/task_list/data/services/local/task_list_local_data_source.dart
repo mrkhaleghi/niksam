@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import 'package:niksam/core/database/local_write_coordinator.dart';
+import 'package:niksam/features/task_list/domain/entities/task_list_query.dart';
 
 class TaskListLocalDataSource {
   const TaskListLocalDataSource(
@@ -13,9 +14,41 @@ class TaskListLocalDataSource {
   final LocalWriteCoordinator _writes;
   final bool failWrites;
 
-  Future<List<Map<String, Object?>>> getTasks() async {
+  Future<({List<Map<String, Object?>> tasks, int totalCount})> getTasks(
+    TaskListQuery query,
+  ) async {
     await _writes.settled;
-    return _database.query('tasks', orderBy: 'created_at DESC, id DESC');
+    final conditions = <String>[];
+    final arguments = <Object?>[];
+    final title = query.title.trim();
+    if (title.isNotEmpty) {
+      // User-entered LIKE wildcards are literal title characters.
+      final escaped = title
+          .replaceAll(r'\', r'\\')
+          .replaceAll('%', r'\%')
+          .replaceAll('_', r'\_');
+      conditions.add(r"title LIKE ? ESCAPE '\'");
+      arguments.add('%$escaped%');
+    }
+    if (query.priority != null) {
+      conditions.add('priority = ?');
+      arguments.add(query.priority!.name);
+    }
+    if (query.completed != null) {
+      conditions.add('is_completed = ?');
+      arguments.add(query.completed! ? 1 : 0);
+    }
+    // Return the matched rows and total count from one consistent read snapshot.
+    return _database.transaction((transaction) async {
+      final tasks = await transaction.query(
+        'tasks',
+        where: conditions.isEmpty ? null : conditions.join(' AND '),
+        whereArgs: arguments,
+        orderBy: 'created_at DESC, id DESC',
+      );
+      final count = await transaction.rawQuery('SELECT COUNT(*) FROM tasks');
+      return (tasks: tasks, totalCount: Sqflite.firstIntValue(count)!);
+    });
   }
 
   Future<List<Map<String, Object?>>> getActivity(int taskId) async {

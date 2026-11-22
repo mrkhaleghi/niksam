@@ -11,6 +11,8 @@ import 'package:niksam/features/task_form/domain/entities/task_form_data.dart';
 import 'package:niksam/features/task_list/data/repositories/task_list_repository_impl.dart';
 import 'package:niksam/features/task_list/data/services/local/task_list_local_data_source.dart';
 import 'package:niksam/features/task_list/domain/entities/task_activity.dart';
+import 'package:niksam/features/task_list/domain/entities/task.dart';
+import 'package:niksam/features/task_list/domain/entities/task_list_query.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -80,7 +82,7 @@ void main() {
         await database.query('activity_events', orderBy: 'id'),
         storedEvents,
       );
-      final task = (await list.getTasks()).single;
+      final task = (await list.getTasks()).tasks.single;
       expect(task.id, id);
       expect(task.isCompleted, isTrue);
       expect(task.createdAt.isUtc, isTrue);
@@ -103,7 +105,7 @@ void main() {
       ]);
       expect(events.last.oldValue, 'medium');
       expect(events.last.newValue, 'high');
-      expect((await list.getTasks()).single.title, 'Renamed');
+      expect((await list.getTasks()).tasks.single.title, 'Renamed');
     },
   );
 
@@ -140,7 +142,7 @@ void main() {
         switch (operation) {
           case 'create':
             await form.createTask(_draft(title: 'Another'));
-            expect((await list.getTasks()).length, 2);
+            expect((await list.getTasks()).tasks.length, 2);
             expect((await database.query('activity_events')).length, 2);
           case 'edit':
             await form.updateTask(
@@ -149,14 +151,14 @@ void main() {
             expect((await list.getActivity(id)).last.newValue, 'high');
           case 'toggle':
             await list.toggleCompleted(id);
-            expect((await list.getTasks()).single.isCompleted, isTrue);
+            expect((await list.getTasks()).tasks.single.isCompleted, isTrue);
             expect(
               (await list.getActivity(id)).last.type,
               TaskActivityType.completed,
             );
           case 'delete':
             await list.deleteTask(id);
-            expect(await list.getTasks(), isEmpty);
+            expect((await list.getTasks()).tasks, isEmpty);
             expect(await database.query('activity_events'), isEmpty);
         }
       },
@@ -219,7 +221,7 @@ void main() {
               : TaskActivityType.reopened,
         ),
       ]);
-      expect((await list.getTasks()).single.isCompleted, isTrue);
+      expect((await list.getTasks()).tasks.single.isCompleted, isTrue);
       for (var i = 1; i < events.length; i++) {
         expect(
           events[i].occurredAt.isBefore(events[i - 1].occurredAt),
@@ -250,7 +252,120 @@ void main() {
       ]);
       expect(events[3].oldValue, 'high');
       expect(events[3].newValue, 'low');
-      expect((await list.getTasks()).single.isCompleted, isFalse);
+      expect((await list.getTasks()).tasks.single.isCompleted, isFalse);
+    },
+  );
+
+  test(
+    'SQL combines title, priority and completion while keeping total count',
+    () async {
+      final openHigh = await form.createTask(
+        _draft(title: 'Build app', priority: TaskFormPriority.high),
+      );
+      final doneHigh = await form.createTask(
+        _draft(title: 'Build done', priority: TaskFormPriority.high),
+      );
+      await list.toggleCompleted(doneHigh);
+      final low = await form.createTask(
+        _draft(title: 'Build docs', priority: TaskFormPriority.low),
+      );
+      await form.createTask(
+        _draft(
+          title: 'Other',
+          description: 'Build app',
+          priority: TaskFormPriority.high,
+        ),
+      );
+
+      final open = await list.getTasks(
+        query: const TaskListQuery(
+          title: '  bUiLd  ',
+          priority: TaskPriority.high,
+          completed: false,
+        ),
+      );
+      expect(open.tasks.map((task) => task.id), [openHigh]);
+      expect(open.totalCount, 4);
+      final done = await list.getTasks(
+        query: const TaskListQuery(
+          title: 'build',
+          priority: TaskPriority.high,
+          completed: true,
+        ),
+      );
+      expect(done.tasks.map((task) => task.id), [doneHigh]);
+      expect(
+        (await list.getTasks(
+          query: const TaskListQuery(title: 'build'),
+        )).tasks.map((task) => task.id),
+        [low, doneHigh, openHigh],
+      );
+      expect((await list.getTasks()).tasks.length, 4);
+    },
+  );
+
+  test(
+    'SQL treats wildcard and quote characters as literal title input',
+    () async {
+      final percent = await form.createTask(_draft(title: '100% ready'));
+      final underscore = await form.createTask(_draft(title: 'a_b'));
+      final backslash = await form.createTask(_draft(title: r'folder\file'));
+      final quote = await form.createTask(_draft(title: "Owner's task"));
+      await form.createTask(_draft(title: '1000 ready and axb'));
+      for (final entry in {
+        '%': percent,
+        '_': underscore,
+        r'\': backslash,
+        "'": quote,
+      }.entries) {
+        final result = await list.getTasks(
+          query: TaskListQuery(title: entry.key),
+        );
+        expect(result.tasks.map((task) => task.id), [entry.value]);
+      }
+      final injection = await list.getTasks(
+        query: const TaskListQuery(title: "%' OR 1=1 --"),
+      );
+      expect(injection.tasks, isEmpty);
+      expect(injection.totalCount, 5);
+    },
+  );
+
+  test(
+    'SQL searches Persian titles and distinguishes no matches from no tasks',
+    () async {
+      final empty = await list.getTasks(
+        query: const TaskListQuery(title: 'کار'),
+      );
+      expect(empty.tasks, isEmpty);
+      expect(empty.totalCount, 0);
+      final id = await form.createTask(_draft(title: 'انجام کار روزانه'));
+      expect(
+        (await list.getTasks(
+          query: const TaskListQuery(title: 'کار'),
+        )).tasks.single.id,
+        id,
+      );
+      final noMatches = await list.getTasks(
+        query: const TaskListQuery(title: 'missing'),
+      );
+      expect(noMatches.tasks, isEmpty);
+      expect(noMatches.totalCount, 1);
+    },
+  );
+
+  test(
+    'filtered rows keep deterministic creation order when timestamps tie',
+    () async {
+      final first = await form.createTask(_draft(title: 'Match first'));
+      final second = await form.createTask(_draft(title: 'Match second'));
+      await database.update('tasks', {'created_at': 10});
+      expect(
+        (await list.getTasks(
+          query: const TaskListQuery(title: 'Match'),
+        )).tasks.map((task) => task.id),
+        [second, first],
+      );
     },
   );
 

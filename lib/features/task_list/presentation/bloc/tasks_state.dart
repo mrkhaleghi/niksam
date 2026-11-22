@@ -12,6 +12,7 @@ enum ActivityLoadStatus { initial, loading, empty, success, failure }
 class TasksState {
   TasksState({
     List<Task> tasks = const [],
+    this.totalCount = 0,
     this.query = '',
     this.priorityFilter,
     this.completionFilter,
@@ -24,6 +25,7 @@ class TasksState {
        activity = List.unmodifiable(activity);
 
   final List<Task> tasks;
+  final int totalCount;
   final String query;
   final TaskPriority? priorityFilter;
   final CompletionFilter? completionFilter;
@@ -33,27 +35,9 @@ class TasksState {
   final List<TaskActivity> activity;
   final ActivityLoadStatus activityStatus;
 
-  List<Task> get visibleTasks {
-    final normalizedQuery = query.trim().toLowerCase();
-    return tasks
-        .where((task) {
-          final matchesQuery =
-              normalizedQuery.isEmpty ||
-              task.title.toLowerCase().contains(normalizedQuery);
-          final matchesPriority =
-              priorityFilter == null || task.priority == priorityFilter;
-          final matchesCompletion = switch (completionFilter) {
-            CompletionFilter.active => !task.isCompleted,
-            CompletionFilter.completed => task.isCompleted,
-            null => true,
-          };
-          return matchesQuery && matchesPriority && matchesCompletion;
-        })
-        .toList(growable: false);
-  }
-
   TasksState copyWith({
     List<Task>? tasks,
+    int? totalCount,
     String? query,
     TaskPriority? priorityFilter,
     bool clearPriorityFilter = false,
@@ -67,6 +51,7 @@ class TasksState {
     ActivityLoadStatus? activityStatus,
   }) => TasksState(
     tasks: tasks ?? this.tasks,
+    totalCount: totalCount ?? this.totalCount,
     query: query ?? this.query,
     priorityFilter: clearPriorityFilter
         ? null
